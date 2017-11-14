@@ -2,21 +2,21 @@
 
 Block::Block(){
 	value = 0;
-	status = false;
+	age = 0;
 }
 
-void Block::setValueBlock(int v){
+void Block::set_value_block(int v){
 	value = v;
 }
 
-void Block::setAccessStatus(bool s){
-	status = s;
+void Block::set_age_block(int a){
+	age = a;
 }
 
-int Block::getValueBlock(){
+int Block::get_value_block(){
 	return value;
 }
 
-bool Block::getAccessStatus(){
-	return status;
+int Block::get_age_block(){
+	return age;
 }

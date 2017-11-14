@@ -2,11 +2,11 @@ class Block
 {
 	public:
 		Block();
-		void setValueBlock(int);
-		void setAccessStatus(bool);
-		int getValueBlock();
-		bool getAccessStatus();
+		void set_value_block(int);
+		void set_age_block(int);
+		int get_value_block();
+		int get_age_block();
 	private:
 		int value;
-		bool status;
+		int age;
 };
