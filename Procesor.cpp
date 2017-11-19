@@ -1,5 +1,4 @@
 #include <iostream>
-#include <iomanip>
 #include <fstream>
 #include <cstdlib>
 
@@ -19,7 +18,7 @@ Procesor::Procesor(string r, int v, int p, int t)
 	set_associativity(v);
 	set_amount_words(p);
 	set_number_of_blocks(t);
-	//cnt = 0;
+	cnt_it = 0;
 	age = 0;
 	cant_elem_cache = 0;
 	hit = 0;
@@ -110,8 +109,8 @@ bool Procesor::write_exit_file_hit(string nfile)
 	fstream FILE;
 	FILE.open(nfile.c_str(),ios::out);
 	if(FILE){
-		FILE << "Tasa de hit: " << hit*100/age << '%' << endl;
-		FILE << "Tasa de miss: " << 100 - hit*100/age << '%' << endl;
+		FILE << "Tasa de hit: " << hit*100/cnt_it << '%' << endl;
+		FILE << "Tasa de miss: " << 100 - hit*100/cnt_it << '%' << endl;
 		return true;
 	}
 	return false;
@@ -124,13 +123,32 @@ bool Procesor::valid_config_cache(int v, int p, int t, string s)
 	return true;
 }
 
+void Procesor::FIFO(int set_pos, int s, int e)
+{
+	int older = cache[set_pos][0].get_age_in_word(0);
+	int pos_block_older = 0;
+	for(int i = 0; i < get_associativity(); i++){
+		for(int j = 0; j < get_amount_words(); j++){
+			if(cache[set_pos][i].get_age_in_word(j) <= older){
+				older = cache[set_pos][i].get_age_in_word(j);
+				pos_block_older = i;
+			}
+		}
+	}
+	for(int j = s,i=0; j <= e; j++,i++){
+		cache[set_pos][pos_block_older].set_value_word(i,j);
+		cache[set_pos][pos_block_older].set_age_word(i,age);
+		age++;
+	}
+	cnt_it++;
+}
+
 void Procesor::LRU(int set_pos, int s, int e)
 {
 	int older = cache[set_pos][0].get_age_in_word(0);
 	int pos_block_older = 0;
 	for(int i = 0; i < get_associativity(); i++){
 		for(int j = 0; j < get_amount_words(); j++){
-			cout << "age: " <<cache[set_pos][i].get_age_in_word(j) << endl; 
 			if(cache[set_pos][i].get_age_in_word(j) <= older){
 				older = cache[set_pos][i].get_age_in_word(j);
 				pos_block_older = i;
@@ -142,6 +160,7 @@ void Procesor::LRU(int set_pos, int s, int e)
 		cache[set_pos][pos_block_older].set_age_word(i,age);
 		age++;
 	}
+	cnt_it++;
 }
 
 void Procesor::MRU(int set_pos, int s, int e)
@@ -150,45 +169,53 @@ void Procesor::MRU(int set_pos, int s, int e)
 	int pos_block_younger = 0;
 	for(int i = 0; i < get_associativity(); i++){
 		for(int j = 0; j < get_amount_words(); j++){
-			cout << "age: " <<cache[set_pos][i].get_age_in_word(j) << endl;
 			if(cache[set_pos][i].get_age_in_word(j) >= younger){
 				younger = cache[set_pos][i].get_age_in_word(j);
 				pos_block_younger = i;
 			}
 		}
 	}
-	cout << "***" << endl;
-	cout << younger << endl;
-	cout << pos_block_younger << endl;
 	for(int j = s, i = 0; j <= e; j++,i++){
 		cache[set_pos][pos_block_younger].set_value_word(i,j);
 		cache[set_pos][pos_block_younger].set_age_word(i,age);
 		age++;
 	}
+	cnt_it++;
 
 }
 
 bool Procesor::direct_mapped(int v)
 {
 	age++;
+	int cnt = 0;
 	int aux = v%get_number_of_blocks();
-	for(int i = 0; i < get_amount_words(); i++){
-		if(cache[aux][0].get_age_in_word(i) == 0){
-			cache[aux][0].set_value_word(i,v);
-			cache[aux][0].set_age_word(i,age);
-			return false;
-		} 
-		else if(cache[aux][0].get_value_in_word(i) == v && cache[aux][0].get_age_in_word(i) != 0){
-			cache[aux][0].set_age_word(i,age);
-			return true;
+	int initial_range = ((v*4)/(4*get_amount_words()))*(4*get_amount_words())/4;
+	int end_range = ((((v*4)/(4*get_amount_words()))*(4*get_amount_words())) + ((4*get_amount_words()) - 1))/4;
+	if(cache[aux][0].get_age_in_word(0) == 0){
+		for(int j = initial_range,pos=0;j<=end_range;j++){
+			cache[aux][0].set_value_word(pos,j);
+			cache[aux][0].set_age_word(pos,age);
+			age++;
 		}
-		else if(cache[aux][0].get_value_in_word(i) != v && cache[aux][0].get_age_in_word(i) != 0){
-			cache[aux][0].set_value_word(i,v);
-			cache[aux][0].set_age_word(i,age);
-			return false;
+		cnt_it++;
+		return false;
+	} 
+	
+	else if(cache[aux][0].get_age_in_word(0) != 0){
+		for(int j = 0; j < get_amount_words(); j++){
+			if(cache[aux][0].get_value_in_word(j) == v){
+				//hit
+				age++;
+				cnt_it++;
+				return true;
+			}
+			else cnt++;
 		}
 	}
-	return false;
+	if(cnt == get_amount_words()){
+		FIFO(aux,initial_range,end_range);
+		return false;
+	}
 }
 
 bool Procesor::Set_associativity(int v)
@@ -203,13 +230,12 @@ bool Procesor::Set_associativity(int v)
 	{
 		if(cache[set][i].get_age_in_word(0) == 0)
 		{
-			//miss
 			for(int j = initial_range,pos = 0; j <= end_range; j++,pos++){
 				cache[set][i].set_value_word(pos,j);
 				cache[set][i].set_age_word(pos,age);
 				age++;	
 			}
-			show_cache();
+			cnt_it++;
 			return false;
 		}
 		else if(cache[set][i].get_age_in_word(0) != 0)
@@ -217,12 +243,11 @@ bool Procesor::Set_associativity(int v)
 			for(int j = 0; j < get_amount_words(); j++)
 			{
 				if(cache[set][i].get_value_in_word(j) == v){
-					//hit
 					for(int k = 0; k < get_amount_words(); k++){
-						cache[set][i].set_age_word(k,age);	
+						if(get_replacement_scheme() != 'F')	cache[set][i].set_age_word(k,age);	
 						age++;
 					}
-					show_cache();
+					cnt_it++;
 					return true;
 				}
 				else cnt++;
@@ -238,8 +263,10 @@ bool Procesor::Set_associativity(int v)
 				case 'M':
 					MRU(set,initial_range,end_range);
 					break;
+				case 'F':
+					FIFO(set,initial_range,end_range);
+					break;
 			}
-			show_cache();
 			return false;
 		}
 	}

@@ -79,7 +79,7 @@ int main(int argc, char **argv)
 							cout << "El archivo " << exit_file_cache << " fue creado con exito" << endl;
 						else cout << "Error al escribir archivo" << endl;
 						if(procesor.write_exit_file_hit(exit_file_hit))
-							cout << "El archivo " << exit_file_hit << " fue creado con exit" << endl;
+							cout << "El archivo " << exit_file_hit << " fue creado con exito" << endl;
 						else cout << "Error al escribir el archivo" << endl;
 						cout << "Presione cualquier tecla para continuar...";
 						cin >> pause; 

@@ -1,2 +1,0 @@
-Tasa de hit: 11.7647%
-Tasa de miss: 88.2353%

@@ -21,7 +21,7 @@ class Procesor
 		void set_cnt_words_per_block(int);
 		void LRU(int,int,int);
 		void MRU(int,int,int);
-		//void FIFO(int);
+		void FIFO(int,int,int);
 		void ejecutar();
 		void show_cache();
 
@@ -40,7 +40,7 @@ class Procesor
 
 
 	private:
-		//int cnt;
+		int cnt_it;
 		int age;
 		float hit;
 		int cant_elem_cache;
