@@ -20,8 +20,11 @@ Procesor::Procesor(string r, int v, int p, int t)
 	set_amount_words(p);
 	set_number_of_blocks(t);
 	cnt = 0;
+	age = 0;
 	cant_elem_cache = 0;
+	hit = 0;
 	set_cache(v,t);
+	cnt_words_per_block = v*p;
 }
 
 void Procesor::set_associativity(int v){
@@ -44,18 +47,11 @@ void Procesor::set_number_of_blocks(int t){
 
 void Procesor::set_cache(int v, int t)
 {
-	cache = new Block*[t];
-	for(int i = 0; i < t; i++){
-		cache[i] = new Block[v];		
-	}
-	for(int i = 0; i < t; i++){
-		for(int j = 0; j < v; j++){
-			//cache[i][j].set_age_block(0);
-			//cache[i][j].set_value_block(0);
-			cache[i][j] = Block();
-		}	
+	cache = new Block*[t/v];
+	for(int i = 0; i < t; i++)	cache[i] = new Block[v];		
+	for(int i = 0; i < t/v; i++){
+		for(int j = 0; j < v; j++)	cache[i][j] = Block(get_amount_words());
 	} 
-	
 }
 
 int Procesor::get_associativity(){
@@ -86,56 +82,141 @@ bool Procesor::read_file(string nfile){
 	}
 }
 
-bool Procesor::valid_config_cache(int v, int t, int p)
+bool Procesor::write_exit_file_cache(string nfile)
 {
-	
+	fstream FILE;
+	int aux = get_number_of_blocks()/get_associativity();
+	FILE.open(nfile.c_str(),ios::out);
+	if(FILE){
+		for(int i = 0; i < aux; i++){
+			for(int j = 0; j < get_associativity(); j++){
+				for(int k = 0; k < get_amount_words(); k++){ 
+					if(cache[i][j].get_age_in_word(k) != 0)
+						FILE << "s" << i << ": "<< "b" << j << ": " << "w" << k << ":" << cache[i][j].get_value_in_word(k)<< endl;
+					else if(cache[i][j].get_age_in_word(k) == 0)
+						FILE << "s" << i << ": "<< "b" << j << ": " << "w" << k << ":-" << endl;
+				}
+			}
+		}
+		FILE.close();
+		return true;
+	}
+	return false;
+}
+
+bool Procesor::write_exit_file_hit(string nfile)
+{
+	fstream FILE;
+	FILE.open(nfile.c_str(),ios::out);
+	if(FILE){
+		FILE << "Tasa de hit: " << hit*100/age << '%' << endl;
+		FILE << "Tasa de miss: " << 100 - hit*100/age << '%' << endl;
+		return true;
+	}
+	return false;
+}
+
+bool Procesor::valid_config_cache(int v, int p, int t, string s)
+{
+	if(s != "FIFO" && v == 1)	return false;	
+	else if((v != 1 && v%2!= 0) || (p !=1 && p%2 != 0) || t%2!=0) return false;
 	return true;
 }
 
-void Procesor::LRU(int v)
+void Procesor::LRU(int set_pos, int s, int e)
 {
-	int min_age = cache[0][0].get_age_block();
-	int pos_min_age_i = 0;
-	int pos_min_age_j = 0;
-	int cnt = 0;
-	for(int i = 1; cnt < cant_elem_cache; i++){
-		for(int j = 0; j < get_associativity(); j++){
-			if(cache[i][j].get_age_block() != 0 && cache[i][j].get_age_block() <= min_age){
-				min_age = cache[i][j].get_age_block();
-				pos_min_age_i = i;
-				pos_min_age_j = j;
-			}
+	int older = cache[set_pos][0].get_age_in_word(0);
+	int pos_block_older = 0;
+	for(int i = 0; i < get_associativity(); i++){
+		for(int j = 0; j < get_amount_words(); j++){
+			if(cache[set_pos][i].get_age_in_word(j) <= older){
+				older = cache[set_pos][i].get_age_in_word(j);
+				pos_block_older = i;
+			}	
 		}
 	}
-	cnt++;
-	cache[pos_min_age_i][pos_min_age_j].set_value_block(v);
-	cache[pos_min_age_i][pos_min_age_j].set_age_block(cnt);
-
+	for(int j = s, i = 0; j <=e; j++,i++){
+		cache[set_pos][pos_block_older].set_value_word(i,j);
+		cache[set_pos][pos_block_older].set_age_word(i,age);
+		age++;
+	}
 }
 
-bool Procesor::direct_mapped(int v, char scheme)
+bool Procesor::direct_mapped(int v)
 {
+	age++;
 	int aux = v%get_number_of_blocks();
-	if(cache[aux][0].get_value_block() == v){
-		cnt++;
-		cache[aux][0].set_age_block(cnt);
-		return true;
+	for(int i = 0; i < get_amount_words(); i++){
+		if(cache[aux][0].get_age_in_word(i) == 0){
+			cache[aux][0].set_value_word(i,v);
+			cache[aux][0].set_age_word(i,age);
+			return false;
+		} 
+		else if(cache[aux][0].get_value_in_word(i) == v && cache[aux][0].get_age_in_word(i) != 0){
+			cache[aux][0].set_age_word(i,age);
+			return true;
+		}
+		else if(cache[aux][0].get_value_in_word(i) != v && cache[aux][0].get_age_in_word(i) != 0){
+			cache[aux][0].set_value_word(i,v);
+			cache[aux][0].set_age_word(i,age);
+			return false;
+		}
 	}
-	else if(cache[aux][0].get_age_block() != 0 && cache[aux][0].get_value_block() != v){
-		//if(scheme == 'L')	LRU(v);
-		//else if(scheme == 'M') MRU(v);
-		//else if(scheme == 'F') FIFO(v);
-		cnt++;
-		cache[aux][0].set_value_block(v);
-		cache[aux][0].set_age_block(cnt);
-		return false;
+	return false;
+}
+
+bool Procesor::Set_associativity(int v)
+{
+	age++;
+	int aux;
+	int cnt = 0;
+	int set = (v*4/(4*get_amount_words()))%(get_number_of_blocks()/get_associativity());
+	int initial_range = ((v*4)/(4*get_amount_words()))*(4*get_amount_words())/4;
+	int end_range = ((((v*4)/(4*get_amount_words()))*(4*get_amount_words())) + ((4*get_amount_words()) - 1))/4;
+	for(int i = 0; i < get_associativity(); i++)
+	{
+		for(int j = 0; j < get_amount_words(); j++)
+		{
+			if(cache[set][i].get_value_in_word(j) == v && cache[set][i].get_age_in_word(j) != 0)
+			{
+				cout << "hit" << endl;
+				cache[set][i].set_age_word(j,age);
+				show_cache();
+				return true;
+			}
+			else if(cache[set][i].get_age_in_word(0) == 0)
+			{
+				//miss
+				for(int j = initial_range,pos = 0; j <= end_range; j++,pos++){
+					cache[set][i].set_value_word(pos,j);
+					cache[set][i].set_age_word(pos,age);
+					age++;	
+				}
+				show_cache();
+				return false;
+			}
+			else if(cache[set][i].get_value_in_word(i) != v && cache[set][i].get_age_in_word(i) != 0)
+			{
+				if(cnt == cnt_words_per_block/2){
+					switch(get_replacement_scheme())
+					{
+						case 'L':
+							cout << "#" << endl;
+							LRU(set,initial_range,end_range);
+						break;
+						case 'M':
+						break;
+						case 'F':
+						break;
+					}
+					show_cache();
+					return false;
+				} 
+				else cnt++;
+			}	
+		}
 	}
-	else if(cache[aux][0].get_age_block() == 0){
-		cnt++;
-		cache[aux][0].set_value_block(v);
-		cache[aux][0].set_age_block(cnt);
-		return false;
-	}
+	
 }
 
 void Procesor::ejecutar()
@@ -143,24 +224,34 @@ void Procesor::ejecutar()
 	list<int>::iterator aux;
 	aux = data.begin();
 	int dato;
-	int hit = 0;
 	if(get_associativity() == 1){
 		while(aux!=data.end()){
 			dato = *aux;
-			if(direct_mapped(dato,get_replacement_scheme())) hit++;
+			if(direct_mapped(dato)) hit++;
 			aux++;
 		}	
 	}
-	//otr caso
+	else if(get_associativity() > 1){
+		while(aux!=data.end()){
+			dato = *aux;
+			if(Set_associativity(dato)) hit++;
+			aux++;
+		}
+	}
 }
 
 void Procesor::show_cache()
 {
+	int aux = get_number_of_blocks()/get_associativity();
 	cout << "*** Contenido cache ***" << endl;
-	for(int i = 0; i < get_number_of_blocks(); i++){
+	for(int i = 0; i < aux; i++){
 		for(int j = 0; j < get_associativity(); j++){
-			if(cache[i][j].get_age_block() != 0) cout << "valor: " << cache[i][j].get_value_block() << endl;
-			else cout << "valor:-" << endl;
+			for(int k = 0; k < get_amount_words(); k++){
+				if(cache[i][j].get_age_in_word(k) != 0)
+					cout << "s" << i << ": "<< "b" << j << ": " << "w" << k << ":" << cache[i][j].get_value_in_word(k)<< endl;
+				else if(cache[i][j].get_age_in_word(k) == 0)
+					cout << "s" << i << ": "<< "b" << j << ": " << "w" << k << ":-" << endl;
+			}
 		}
 	}
 }

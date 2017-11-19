@@ -18,8 +18,10 @@ int main(int argc, char **argv)
 		string cad;
 		int ans;
 		string file;
+		string exit_file_cache;
+		string exit_file_hit;
 		Procesor procesor = Procesor(argv[1],atoi(argv[2]),atoi(argv[3]),atoi(argv[4]));
-		if(procesor.valid_config_cache(atoi(argv[2]),atoi(argv[3]),atoi(argv[4])))
+		if(procesor.valid_config_cache(atoi(argv[2]),atoi(argv[3]),atoi(argv[4]),argv[1]))
 		{
 			do
 			{
@@ -66,8 +68,19 @@ int main(int argc, char **argv)
 						cin >> pause; 
 					break;
 					case 3:
+						system("cls");
+						cout << "Ingrese nombre del archivo de salida de cache: ";
+						cin >> exit_file_cache;
+						cout << "Ingrese nombre del archviod de salida para tasa de hit y miss: ";
+						cin >> exit_file_hit;
 						procesor.ejecutar();
 						procesor.show_cache();
+						if(procesor.write_exit_file_cache(exit_file_cache))
+							cout << "El archivo " << exit_file_cache << " fue creado con exito" << endl;
+						else cout << "Error al escribir archivo" << endl;
+						if(procesor.write_exit_file_hit(exit_file_hit))
+							cout << "El archivo " << exit_file_hit << " fue creado con exit" << endl;
+						else cout << "Error al escribir el archivo" << endl;
 						cout << "Presione cualquier tecla para continuar...";
 						cin >> pause; 
 					break;
@@ -77,6 +90,7 @@ int main(int argc, char **argv)
 				if(ans > 0 && ans <= 3) ans = 0;
 			}while(ans!=4);
 		}
+		else cout << "No ha ingresado una configuracion valida para el cache" << endl;
 	}
 	else{
 		cout << "No ha ingresado correctamente los parametros de ejecucion."<< endl;	
